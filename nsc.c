@@ -60,10 +60,42 @@ int main (int argc, char *argv[]){
         fprintf(stderr, "Reading failed\n");
         return 1;
     }
-    char wiersz[MAX_LINE];
-    while (fgets(wiersz, sizeof(wiersz), plik)){
-        printf("%s \n",wiersz);
+    //Bezpiecznie zpisuję nazwe pliku, który chcę zmodyfikować
+    char output[MAX_LINE];
+    strncpy(output, argv[1], MAX_LINE - 1);
+    //Ochrona przed przepełnieniem bufora
+    output[MAX_LINE - 1] = '\0'; 
+    char *kropka = strrchr(output, '.');
+    if (kropka) *kropka = '\0';
+    //Tworze tymczasowy plik
+    FILE *tmp = fopen("/tmp/nsc_temp.c", "w");
+    if (!tmp) {
+        fprintf(stderr, "Creation of temp file failed\n");
+        fclose(plik);
+        return 1;
     }
+    //do którego będę wpisywał poprawiony kod...
+    char wiersz[MAX_LINE];
+    while (fgets(wiersz, sizeof(wiersz), plik)) {
+        if (czy_srednik(wiersz)) {
+            wiersz[strcspn(wiersz, "\n")] = '\0';
+            fprintf(tmp, "%s;\n", wiersz);
+        } else {
+            fprintf(tmp, "%s", wiersz);
+        }
+    }
+    fclose(tmp);
     fclose(plik);
+    //i który następnie skompiluję...
+    char bash[MAX_LINE*2];
+    snprintf(bash, sizeof(bash), "gcc /tmp/nsc_temp.c -o %s", output);
+    int wynik = system(bash);
+    //a pod koniec usuwam, aby zachować czystość
+    remove("/tmp/nsc_temp.c");
+    if(wynik){
+        fprintf(stderr, "Compilation failed \n");
+        return 1;
+    }
+    printf("Compiled. Run with: ./%s \n",output);
     return 0;
 }
